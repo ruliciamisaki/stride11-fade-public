@@ -1,0 +1,56 @@
+MIT License
+
+Copyright (c) 2026 RuliciaMisaki
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--------------------------------------------------------------------------
+
+例外 / Exception
+
+上の MIT License は、このリポジトリに含まれる自作部分に対するものです。
+第三者の著作物に由来する部分は対象外で、その原著作者の条件に従います。
+
+いま該当するのは次の1つです（立ち絵向けのツールを同梱している場合にだけ
+リポジトリに存在します）。
+
+  tools/rpgmaker-standing-picture-patcher/patches.js
+
+  このファイルは「原プラグインのどこを何に差し替えるか」の手順書です。
+  追加しているコードは自作ですが、差し替える位置を決めるための引用として、
+  ルルの教会（Lulu's Church）の LL_StandingPicture.js / LL_StandingPictureMV.js
+  の行が一部含まれています（原本の実質的な行数の 3〜5% 程度）。
+  その部分の権利は原著作者にあり、利用条件は下記を参照してください。
+
+    https://nine-yusha.com/plugin-spicture/
+    https://nine-yusha.com/plugin/
+
+  同ツールが生成する改変版プラグインも、原プラグインの利用条件に従います。
+  **素材単体での再配布は、改変後のものを含めて禁止されています。**
+  ゲームに含めての配布は問題ありません。
+
+The MIT License above covers the original work in this repository. Parts
+derived from third-party material are excluded and follow their author's
+terms. At present that means the one file listed above, which exists in the
+repository only when the standing-picture tools are included: it carries a
+small amount of text (about 3–5% of the original's substantive lines) from
+Lulu's Church's LL_StandingPicture.js / LL_StandingPictureMV.js, quoted only
+to locate where the modifications go. The plugin that tool produces likewise
+follows the original's terms: redistribution as material on its own is not
+permitted, modified versions included, while shipping it inside a game is fine.

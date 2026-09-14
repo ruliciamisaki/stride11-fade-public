@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reveal Map Generator — Stride11 Fade</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="mast">
+  <div class="kicker">Stride11 Fade — for After Effects</div>
+  <h1>Reveal Map Generator</h1>
+  <p class="dek">The whole fade folds into <b>one still image</b>. Export a map that stores, as luminance, when each cell gets painted; on the After Effects side you just <b>ramp a threshold with a single pair of keyframes</b>. No mask sequences needed.</p>
+</header>
+
+<main>
+
+<!-- ============ 1. composition ============ -->
+<section class="card">
+  <h2><span class="step">1</span>Composition size</h2>
+  <p class="lead">The lattice is stretched across the <strong>whole composition</strong>. Whatever size the overlay is and wherever it sits, the weave you see inside it is part of one screen-wide lattice. That is what makes the effect read as covering the entire screen.</p>
+  <div class="grid-opts">
+    <label class="field"><span>Width (px)</span><input type="number" id="compW" value="1920" min="8" max="16384" step="1"></label>
+    <label class="field"><span>Height (px)</span><input type="number" id="compH" value="1080" min="1" max="16384" step="1"></label>
+    <div class="field">
+      <span>Presets</span>
+      <div class="ctl" style="margin:0">
+        <button type="button" class="mini" data-comp="640,400">640x400</button>
+        <button type="button" class="mini" data-comp="1280,800">1280x800</button>
+        <button type="button" class="mini" data-comp="1920,1080">1920x1080</button>
+        <button type="button" class="mini" data-comp="1920,1200">1920x1200</button>
+        <button type="button" class="mini" data-comp="3840,2160">3840x2160</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. pattern ============ -->
+<section class="card">
+  <h2><span class="step">2</span>Lattice pattern</h2>
+  <div class="patterns" id="patterns"></div>
+  <label class="field inline" id="remModeWrap" hidden>
+    <span>Remainder when it does not divide evenly</span>
+    <select id="remMode">
+      <option value="even" selected>Spread one pixel at a time across all dots</option>
+      <option value="edge">Absorbed by the right / bottom dots</option>
+    </select>
+    <em>Either way the boundaries stay on whole pixels.</em>
+  </label>
+  <div class="geo" id="geo">—</div>
+</section>
+
+<!-- ============ 3. fade settings ============ -->
+<section class="card">
+  <h2><span class="step">3</span>Fade settings</h2>
+  <div class="grid-opts">
+    <label class="field">
+      <span>Stride (bytes skipped per pass)</span>
+      <input type="number" id="stride" value="11" min="1" max="255" step="1">
+      <em id="strideHint"></em>
+    </label>
+    <label class="field">
+      <span>Plane order</span>
+      <select id="planeOrder">
+        <option value="brg" selected>blue &gt; red &gt; green (PC-88 hardware, ports 5CH/5DH/5EH)</option>
+        <option value="grb">green &gt; red &gt; blue (reversed)</option>
+        <option value="rgb">red &gt; green &gt; blue</option>
+        <option value="all">all three at once (one mask is enough)</option>
+      </select>
+      <em id="planeHint"></em>
+    </label>
+    <label class="field">
+      <span>Total duration (s)</span>
+      <input type="number" id="dur" value="1.44" min="0.05" max="60" step="0.01">
+      <em id="durHint"></em>
+    </label>
+  </div>
+</section>
+
+<!-- ============ 4. preview ============ -->
+<section class="card">
+  <h2><span class="step">4</span>Preview</h2>
+  <p class="lead">Check the overlay composited over the base. <strong>Any size, any position.</strong> Transparent areas keep the base showing through. This is only for checking — what you export does not depend on these images.</p>
+
+  <div class="slots">
+    <div class="slot">
+      <div class="slot-head">
+        <span class="slot-title">Base (lower)</span>
+        <div class="slot-btns">
+          <button type="button" data-fill="A" data-color="#000000" class="mini">black</button>
+          <button type="button" data-fill="A" data-color="#203050" class="mini">navy</button>
+        </div>
+      </div>
+      <label class="drop" for="fileA" id="dropA">
+        <canvas class="thumb" id="thumbA" width="16" height="10"></canvas>
+        <span class="drop-hint">click or drag &amp; drop</span>
+      </label>
+      <input type="file" id="fileA" accept="image/*" hidden>
+      <div class="slot-meta" id="metaA">nothing loaded</div>
+    </div>
+
+    <div class="arrow" aria-hidden="true">+</div>
+
+    <div class="slot">
+      <div class="slot-head">
+        <span class="slot-title">Overlay (upper)</span>
+        <div class="slot-btns">
+          <button type="button" id="btnCenter" class="mini">centre</button>
+          <button type="button" id="btnFit" class="mini">fit to screen</button>
+        </div>
+      </div>
+      <label class="drop" for="fileB" id="dropB">
+        <canvas class="thumb" id="thumbB" width="16" height="10"></canvas>
+        <span class="drop-hint">click or drag &amp; drop (PNG alpha supported)</span>
+      </label>
+      <input type="file" id="fileB" accept="image/*" hidden>
+      <div class="slot-meta" id="metaB">nothing loaded</div>
+    </div>
+  </div>
+
+  <div class="grid-opts" style="margin-top:1rem">
+    <label class="field"><span>Overlay X</span><input type="number" id="ovlX" value="0" step="1"></label>
+    <label class="field"><span>Overlay Y</span><input type="number" id="ovlY" value="0" step="1"></label>
+    <label class="field"><span>Scale (%)</span><input type="number" id="ovlS" value="100" min="1" max="1600" step="1"></label>
+    <label class="field"><span>Overlay opacity (%)</span><input type="number" id="ovlA" value="100" min="0" max="100" step="1"></label>
+  </div>
+
+  <div class="screen" style="margin-top:1rem"><canvas id="preview" width="1920" height="1080"></canvas></div>
+  <div class="ctl">
+    <button type="button" id="btnPlay">Play</button>
+    <input type="range" id="scrub" min="0" max="1000" value="0" step="1" aria-label="progress">
+    <label class="lab">View
+      <select id="view">
+        <option value="comp">composited result</option>
+        <option value="map">reveal map</option>
+        <option value="mask">current mask (RGB = red/green/blue planes)</option>
+      </select>
+    </label>
+  </div>
+  <div class="readout">
+    <span>Progress <b id="roProg">0.0 %</b></span>
+    <span>Time <b id="roTime">0.00 s</b></span>
+    <span>Plane <b id="roPlane">—</b></span>
+    <span>Pass <b id="roPass">—</b></span>
+    <span>Threshold R/G/B <b id="roThr">—</b></span>
+  </div>
+</section>
+
+<!-- ============ 5. export ============ -->
+<section class="card">
+  <h2><span class="step">5</span>Export</h2>
+  <p class="lead">Only these two files go to After Effects.</p>
+  <ul class="k-list">
+    <li><code id="mapName">revealmap.png</code> — the reveal map itself. A still the same size as your composition, where <b>darker means painted earlier</b>.</li>
+    <li><code>stride11_fade_params.json</code> — stride, plane order, duration and the threshold formulas. Handy as a record; the script does not require it.</li>
+  </ul>
+  <div class="ctl export">
+    <button type="button" id="btnMap">Save reveal map</button>
+    <button type="button" id="btnParams">Save params.json</button>
+    <button type="button" id="btnBoth">Save both as ZIP</button>
+  </div>
+  <p class="msg" id="msgExport"></p>
+</section>
+
+<!-- ============ 6. how to wire it up ============ -->
+<section class="card">
+  <h2><span class="step">6</span>Wiring it up in After Effects</h2>
+
+  <div class="h3">The idea</div>
+  <p>The map luminance <code>v</code> (0–254) is the order in which a cell gets painted. With the progress of plane <code>p</code> defined as</p>
+  <pre class="mono" id="formula"></pre>
+  <p>that plane's mask is simply the region where <code>v &lt; 255 × prog<sub>p</sub></code>. So <strong>ramping a threshold from 0 to 255</strong> reproduces the sweep. The three planes reuse the same map, each delayed by one third.</p>
+
+  <div class="h3">After Effects (bundled script)</div>
+  <p>Run <code>stride11_fade.jsx</code> with a composition open, pick the base and overlay layers, and it builds this:</p>
+  <pre class="mono">[master comp]
+  Stride11 Fade CTRL (null) — Slider Control "Fade Progress" 0-100  <- animate this one
+  Stride11 Fade OUT (solid) — Set Channels
+      red   &lt;- MIX_1 red
+      green &lt;- MIX_2 green
+      blue  &lt;- MIX_0 blue
+      alpha &lt;- base layer alpha
+  MIX_0 / MIX_1 / MIX_2   video off (only referenced by Set Channels)
+
+[MIX_p]  top to bottom
+  MASK_p    revealmap.png + Threshold
+  OVERLAY   luma INVERTED track matte from MASK_p
+  BASE      the base image</pre>
+  <p>A luma track matte <strong>multiplies</strong> with the layer's own alpha, so transparent parts of the overlay keep showing the base. Threshold paints <code>v &ge; L</code> white, and the side we want is <code>v &lt; L</code>, which is why the matte is inverted.</p>
+
+  <div class="note">Choosing "all three at once" removes the plane split entirely, leaving <strong>one mask and one track matte</strong>. That is the lightest setup — though you lose the blue-to-magenta-to-full-colour staging.</div>
+</section>
+
+</main>
+<script src="app.js"></script>
+</body>
+</html>

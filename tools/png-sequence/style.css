@@ -1,0 +1,128 @@
+/* ------------------------------------------------------------------ *
+ *  連番PNG作成ツール — Stride11 フェード
+ * ------------------------------------------------------------------ */
+:root{
+  --ground:#EDEEF2; --surface:#F8F9FB; --sunken:#E4E7EE; --inset:#0E0F16;
+  --ink:#171922; --ink-2:#3B404F; --muted:#5C6270;
+  --rule:#D2D6E0; --rule-soft:#E4E7EE;
+  --accent:#2A46C8; --accent-ink:#FFFFFF;
+  --ok:#1E7F45; --warn:#B0521B; --err:#C42B2B;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --ground:#0E0F16; --surface:#171925; --sunken:#12141E; --inset:#07080D;
+    --ink:#E2E5EE; --ink-2:#B7BDCC; --muted:#8B92A6;
+    --rule:#282D3D; --rule-soft:#1E2230;
+    --accent:#6E86FF; --accent-ink:#0B0D14;
+    --ok:#46D982; --warn:#E0A165; --err:#FF5C5C;
+  }
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  font-size:15px; line-height:1.8;
+}
+code,.mono,.readout,.geo,em,.slot-meta,.progress-label{
+  font-family:ui-monospace,"Consolas","M PLUS 1 Code",monospace;
+}
+
+/* ---------- masthead ---------- */
+.mast{max-width:1080px;margin:0 auto;padding:2.6rem 1.4rem 1rem;border-bottom:2px solid var(--ink)}
+.kicker{font-family:ui-monospace,Consolas,monospace;font-size:.72rem;letter-spacing:.18em;color:var(--muted)}
+h1{margin:.5rem 0 0;font-size:clamp(1.6rem,4vw,2.3rem);letter-spacing:.02em;line-height:1.35}
+.dek{margin:.7rem 0 0;max-width:46rem;color:var(--ink-2);font-size:.95rem}
+
+main{max-width:1080px;margin:0 auto;padding:1.6rem 1.4rem 5rem;display:flex;flex-direction:column;gap:1.3rem}
+
+/* ---------- card ---------- */
+.card{background:var(--surface);border:1px solid var(--rule);padding:1.25rem 1.35rem 1.4rem}
+.card h2{margin:0 0 1rem;font-size:1.02rem;display:flex;align-items:center;gap:.6rem;letter-spacing:.02em}
+.step{
+  display:inline-grid;place-items:center;width:1.5rem;height:1.5rem;flex:0 0 auto;
+  background:var(--ink);color:var(--ground);border-radius:50%;
+  font-family:ui-monospace,Consolas,monospace;font-size:.78rem;line-height:1;
+}
+
+/* ---------- image slots ---------- */
+.slots{display:grid;grid-template-columns:1fr auto 1fr;gap:1rem;align-items:start}
+.arrow{align-self:center;color:var(--muted);font-size:1.4rem;padding-top:1.4rem}
+.swap{grid-column:1/-1;display:flex;justify-content:center}
+.slot-head{display:flex;justify-content:space-between;align-items:center;gap:.6rem;margin-bottom:.45rem}
+.slot-title{font-weight:700;font-size:.9rem}
+.slot-btns{display:flex;gap:.35rem}
+.drop{
+  display:grid;place-items:center;gap:.5rem;position:relative;
+  background:var(--inset);border:1px dashed var(--rule);min-height:9rem;padding:.6rem;cursor:pointer;
+}
+.drop.over{border-color:var(--accent);border-style:solid}
+.drop .thumb{max-width:100%;max-height:11rem;image-rendering:pixelated;display:block}
+.drop .drop-hint{position:absolute;bottom:.4rem;font-size:.72rem;color:#8B92A6;pointer-events:none}
+.drop.filled .drop-hint{display:none}
+.slot-meta{margin-top:.4rem;font-size:.74rem;color:var(--muted)}
+
+/* ---------- patterns ---------- */
+.patterns{display:flex;flex-direction:column;gap:.4rem}
+.pat{display:flex;gap:.7rem;align-items:flex-start;padding:.55rem .7rem;border:1px solid var(--rule);background:var(--ground);cursor:pointer}
+.pat:hover{border-color:var(--ink-2)}
+.pat input{margin:.45rem 0 0}
+.pat.sel{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.pat.bad{opacity:.45}
+.pat b{font-size:.88rem;display:block}
+.pat span{font-size:.78rem;color:var(--muted);line-height:1.65;display:block}
+.geo{margin-top:.9rem;padding:.7rem .85rem;background:var(--sunken);border:1px solid var(--rule-soft);font-size:.76rem;color:var(--ink-2);white-space:pre-wrap}
+
+/* ---------- fields ---------- */
+.grid-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:.9rem 1.2rem}
+.field{display:flex;flex-direction:column;gap:.28rem}
+.field>span{font-size:.8rem;font-weight:700}
+.field em{font-style:normal;font-size:.72rem;color:var(--muted);line-height:1.6}
+input[type=text],input[type=number],select{
+  font:inherit;font-size:.85rem;padding:.4rem .55rem;color:var(--ink);
+  background:var(--ground);border:1px solid var(--rule);border-radius:0;
+}
+input[type=number]{font-family:ui-monospace,Consolas,monospace}
+.check{display:flex;align-items:center;gap:.5rem;margin-top:.9rem;font-size:.83rem;cursor:pointer}
+
+button{
+  font:inherit;font-size:.85rem;padding:.45rem 1rem;cursor:pointer;
+  color:var(--ink);background:var(--ground);border:1px solid var(--rule);border-radius:0;
+}
+button:hover:not(:disabled){border-color:var(--ink-2)}
+button:disabled{opacity:.4;cursor:not-allowed}
+button.mini{font-size:.74rem;padding:.22rem .55rem}
+#btnZip,#btnDir{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+#btnZip:hover:not(:disabled),#btnDir:hover:not(:disabled){filter:brightness(1.12)}
+#btnStop{border-color:var(--err);color:var(--err)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- preview ---------- */
+.screen{background:var(--inset);border:1px solid var(--rule);padding:10px;overflow:auto;max-height:70vh}
+.screen canvas{display:block;margin:0 auto;image-rendering:pixelated;max-width:100%;height:auto}
+.ctl{display:flex;flex-wrap:wrap;gap:.6rem .9rem;align-items:center;margin-top:.85rem}
+.ctl.export{margin-top:.4rem}
+.ctl input[type=range]{flex:1 1 14rem;min-width:10rem;accent-color:var(--accent)}
+.lab{font-size:.76rem;color:var(--muted);display:inline-flex;align-items:center;gap:.35rem}
+.readout{display:flex;flex-wrap:wrap;gap:.2rem 1.3rem;margin-top:.7rem;font-size:.75rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.readout b{color:var(--ink);font-weight:500}
+
+/* ---------- messages / progress ---------- */
+.msg{margin:.85rem 0 0;font-size:.78rem;color:var(--muted);min-height:1.2em}
+.msg.ok{color:var(--ok)} .msg.warn{color:var(--warn)} .msg.err{color:var(--err)}
+.progress{margin-top:.9rem}
+.bar{height:.5rem;background:var(--sunken);border:1px solid var(--rule-soft);overflow:hidden}
+.bar-in{height:100%;width:0;background:var(--accent);transition:width .12s linear}
+.progress-label{margin-top:.35rem;font-size:.75rem;color:var(--muted)}
+
+footer{max-width:1080px;margin:0 auto;padding:0 1.4rem 4rem;font-size:.78rem;color:var(--muted);line-height:1.85}
+footer code{background:var(--sunken);padding:.1em .35em;font-size:.95em}
+
+@media (max-width:720px){
+  .slots{grid-template-columns:1fr}
+  .arrow{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* 余りモードの行 */
+.field.inline{margin-top:.9rem;max-width:34rem}

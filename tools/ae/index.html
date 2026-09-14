@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>リビールマップ生成 — Stride11 フェード</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="mast">
+  <div class="kicker">Stride11 フェード — After Effects 用</div>
+  <h1>リビールマップ生成</h1>
+  <p class="dek">フェード全体を <b>静止画1枚</b> に畳み込みます。各セルが「いつ塗られるか」を明度で持つ画像を書き出し、AE 側は<b>しきい値を1本のキーフレームで動かすだけ</b>。連番マスクは要りません。</p>
+</header>
+
+<main>
+
+<!-- ============ 1. コンポジション ============ -->
+<section class="card">
+  <h2><span class="step">1</span>コンポジション（画面）サイズ</h2>
+  <p class="lead">フェードの格子は<strong>コンポジション全体</strong>に張られます。重ね合わせ画像のサイズや位置がどうであれ、そこに出る織り目は画面共通の格子の一部です。だから画面全体にエフェクトがかかって見えます。</p>
+  <div class="grid-opts">
+    <label class="field"><span>幅 (px)</span><input type="number" id="compW" value="1920" min="8" max="16384" step="1"></label>
+    <label class="field"><span>高さ (px)</span><input type="number" id="compH" value="1080" min="1" max="16384" step="1"></label>
+    <div class="field">
+      <span>プリセット</span>
+      <div class="ctl" style="margin:0">
+        <button type="button" class="mini" data-comp="640,400">640×400</button>
+        <button type="button" class="mini" data-comp="1280,800">1280×800</button>
+        <button type="button" class="mini" data-comp="1920,1080">1920×1080</button>
+        <button type="button" class="mini" data-comp="1920,1200">1920×1200</button>
+        <button type="button" class="mini" data-comp="3840,2160">3840×2160</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. パターン ============ -->
+<section class="card">
+  <h2><span class="step">2</span>格子のパターン</h2>
+  <div class="patterns" id="patterns"></div>
+  <label class="field inline" id="remModeWrap" hidden>
+    <span>割り切れないときの余り</span>
+    <select id="remMode">
+      <option value="even" selected>全ドットへ 1px ずつ均等に分配する</option>
+      <option value="edge">右端・下端のドットが吸収する</option>
+    </select>
+    <em>どちらも境界は整数ピクセル。</em>
+  </label>
+  <div class="geo" id="geo">—</div>
+</section>
+
+<!-- ============ 3. フェード設定 ============ -->
+<section class="card">
+  <h2><span class="step">3</span>フェード設定</h2>
+  <div class="grid-opts">
+    <label class="field">
+      <span>ストライド（何バイト飛びか）</span>
+      <input type="number" id="stride" value="11" min="1" max="255" step="1">
+      <em id="strideHint"></em>
+    </label>
+    <label class="field">
+      <span>プレーン順</span>
+      <select id="planeOrder">
+        <option value="brg" selected>青 → 赤 → 緑（PC-88実機 5CH/5DH/5EH）</option>
+        <option value="grb">緑 → 赤 → 青（逆順）</option>
+        <option value="rgb">赤 → 緑 → 青</option>
+        <option value="all">3プレーン同時（マスク1枚だけで済む）</option>
+      </select>
+      <em id="planeHint"></em>
+    </label>
+    <label class="field">
+      <span>フェード全体の尺 (秒)</span>
+      <input type="number" id="dur" value="1.44" min="0.05" max="60" step="0.01">
+      <em id="durHint"></em>
+    </label>
+  </div>
+</section>
+
+<!-- ============ 4. プレビュー ============ -->
+<section class="card">
+  <h2><span class="step">4</span>プレビュー</h2>
+  <p class="lead">元画像に重ね合わせ画像を重ねた結果を確認します。<strong>サイズも位置も自由</strong>。透明部分はそのまま元画像が残ります。ここはあくまで確認用で、書き出す資産は画像に依存しません。</p>
+
+  <div class="slots">
+    <div class="slot">
+      <div class="slot-head">
+        <span class="slot-title">元画像（下）</span>
+        <div class="slot-btns">
+          <button type="button" data-fill="A" data-color="#000000" class="mini">黒</button>
+          <button type="button" data-fill="A" data-color="#203050" class="mini">紺</button>
+        </div>
+      </div>
+      <label class="drop" for="fileA" id="dropA">
+        <canvas class="thumb" id="thumbA" width="16" height="10"></canvas>
+        <span class="drop-hint">クリック / ドラッグ＆ドロップ</span>
+      </label>
+      <input type="file" id="fileA" accept="image/*" hidden>
+      <div class="slot-meta" id="metaA">未読み込み</div>
+    </div>
+
+    <div class="arrow" aria-hidden="true">＋</div>
+
+    <div class="slot">
+      <div class="slot-head">
+        <span class="slot-title">重ね合わせ画像（上）</span>
+        <div class="slot-btns">
+          <button type="button" id="btnCenter" class="mini">中央へ</button>
+          <button type="button" id="btnFit" class="mini">画面に合わせる</button>
+        </div>
+      </div>
+      <label class="drop" for="fileB" id="dropB">
+        <canvas class="thumb" id="thumbB" width="16" height="10"></canvas>
+        <span class="drop-hint">クリック / ドラッグ＆ドロップ（PNGの透明可）</span>
+      </label>
+      <input type="file" id="fileB" accept="image/*" hidden>
+      <div class="slot-meta" id="metaB">未読み込み</div>
+    </div>
+  </div>
+
+  <div class="grid-opts" style="margin-top:1rem">
+    <label class="field"><span>重ねる位置 X</span><input type="number" id="ovlX" value="0" step="1"></label>
+    <label class="field"><span>重ねる位置 Y</span><input type="number" id="ovlY" value="0" step="1"></label>
+    <label class="field"><span>拡大率 (%)</span><input type="number" id="ovlS" value="100" min="1" max="1600" step="1"></label>
+    <label class="field"><span>重ね合わせの不透明度 (%)</span><input type="number" id="ovlA" value="100" min="0" max="100" step="1"></label>
+  </div>
+
+  <div class="screen" style="margin-top:1rem"><canvas id="preview" width="1920" height="1080"></canvas></div>
+  <div class="ctl">
+    <button type="button" id="btnPlay">▶ 再生</button>
+    <input type="range" id="scrub" min="0" max="1000" value="0" step="1" aria-label="進行">
+    <label class="lab">表示
+      <select id="view">
+        <option value="comp">合成結果</option>
+        <option value="map">リビールマップ</option>
+        <option value="mask">現在のマスク（RGB＝赤/緑/青プレーン）</option>
+      </select>
+    </label>
+  </div>
+  <div class="readout">
+    <span>進行 <b id="roProg">0.0 %</b></span>
+    <span>時刻 <b id="roTime">0.00 s</b></span>
+    <span>プレーン <b id="roPlane">—</b></span>
+    <span>パス <b id="roPass">—</b></span>
+    <span>しきい値 R/G/B <b id="roThr">—</b></span>
+  </div>
+</section>
+
+<!-- ============ 5. 書き出し ============ -->
+<section class="card">
+  <h2><span class="step">5</span>書き出し</h2>
+  <p class="lead">AE に渡すのはこの2つだけです。</p>
+  <ul class="k-list">
+    <li><code id="mapName">revealmap.png</code> — リビールマップ本体。<b>暗いほど早く塗られる</b>セルを表す、コンポジションと同じ大きさの静止画。</li>
+    <li><code>stride11_fade_params.json</code> — ストライド・プレーン順・尺・しきい値の式。スクリプトが読みます。</li>
+  </ul>
+  <div class="ctl export">
+    <button type="button" id="btnMap">リビールマップを保存</button>
+    <button type="button" id="btnParams">params.json を保存</button>
+    <button type="button" id="btnBoth">両方まとめて ZIP</button>
+  </div>
+  <p class="msg" id="msgExport"></p>
+</section>
+
+<!-- ============ 6. 使い方 ============ -->
+<section class="card">
+  <h2><span class="step">6</span>After Effects での組み方</h2>
+
+  <div class="h3">共通のしくみ</div>
+  <p>リビールマップの明度 <code>v</code>（0〜255）は「そのセルが塗られる順番」です。プレーン <code>p</code> の進行度を</p>
+  <pre class="mono" id="formula"></pre>
+  <p>とすると、そのプレーンのマスクは <code>v &lt; 255 × prog<sub>p</sub></code> の領域。つまり<strong>しきい値を 0 → 255 へ直線的に動かすだけ</strong>で掃引が再現されます。3プレーンは同じマップを 1/3 ずつ遅らせて使います。</p>
+
+  <div class="h3">After Effects（同梱スクリプト）</div>
+  <p><code>stride11_fade.jsx</code> をコンポジションで実行し、元レイヤーと重ね合わせレイヤーを選ぶと、下記の構造を自動で組みます。</p>
+  <pre class="mono">[マスターコンポ]
+  CTRL (調整レイヤー) ─ Set Channels
+      Source1 = MIX_R から 赤
+      Source2 = MIX_G から 緑
+      Source3 = MIX_B から 青
+      Source4 = 元レイヤー から アルファ
+  Fade Progress スライダー（0〜100）… これ1本をアニメートする
+
+[MIX_B] ┐  上から: MASK_B（マップ＋しきい値）
+[MIX_R] ├─          重ね合わせレイヤー（TrkMat = MASK のルミナンス反転）
+[MIX_G] ┘           元レイヤー
+</pre>
+  <p>ルミナンス反転トラックマットは重ね合わせレイヤー自身のアルファと<strong>掛け算</strong>されるので、透明部分はそのまま元画像が残ります。しきい値は <code>v &ge; L</code> を白にするので、出したい <code>v &lt; L</code> 側を取るために反転を使っています。</p>
+
+  <div class="note">「3プレーン同時」を選ぶとプレーン分けが無くなり、<strong>マスク1枚＋ルミナンストラックマット1つ</strong>だけで完成します。なお だけで完結させたい場合はこちらが現実的です（ただし青→紫→フルカラーの色の段取りは出ません）。</div>
+</section>
+
+</main>
+<script src="app.js"></script>
+</body>
+</html>

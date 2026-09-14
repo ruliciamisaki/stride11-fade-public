@@ -1,0 +1,26 @@
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# エディタ
+.vscode/
+.idea/
+*.swp
+
+# Node
+node_modules/
+
+# 作業用の一時ファイル
+*.tmp
+*.bak
+
+# 配布用に固めたもの（中身は tools/ 以下のソースと同じ）
+*.zip
+
+# 書き出したリビールマップ。生成キット（tools/ae/index.html）を同梱しているので
+# マップ自体は成果物ではない。検証で書き出したものが紛れ込まないよう無視する。
+tools/**/revealmap_*.png
+
+# 検証時の画面録画（tools 配下に置かれる一時的なもの）
+tools/**/画面録画*.mp4
