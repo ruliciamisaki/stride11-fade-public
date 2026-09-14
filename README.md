@@ -17,6 +17,31 @@
 
 同じ演出を、連番PNG・After Effects・RPGツクールの3系統で使えるようにしてあります。
 
+### 出力サンプル
+
+![黒からの出現と消滅](output_sample/aqua88_anim.gif)
+
+**黒い画面から絵が立ち上がり、そのまま消えていくところ**です（640×400・86フレーム）。
+前半は青プレーンだけなので、白くなるはずの領域が**真っ青な幽霊像**として現れます。
+そこへ赤が乗って紫〜赤へ転び、最後に緑が入って本来の色に着地します。**この色の段取りが
+演出の本体**で、単に透明度を上げていくフェードとは似ても似つかない見え方になります。
+
+消えるほうは出現の**厳密な逆再生**です。最初に出たプレーンが最後に消えます。
+
+![背景の上に重ねる（透明合成）](output_sample/darkness88_anim.gif)
+
+**すでに表示されている背景の上に、絵だけを重ねて出すところ**です（640×400・43フレーム）。
+背景の森は最初から最後までそのまま残り、立ち絵だけがプレーン順に立ち上がります。
+
+ここが厄介なところで、**チャンネルごとに背景の透け具合が違う**状態（赤と緑は背景が
+そのまま見えていて、青だけ絵が出ている）は、アルファ1本では表現できません。そのため
+**乗算と加算の2枚に分けて**合成しています。塗っていないセルは完全に透明、塗り終わると
+通常のアルファ合成と厳密に一致するので、**継ぎ目なく始まって継ぎ目なく終わります**。
+
+どちらも格子は**画面全体**に張られています。絵をどこに置いても、織り目が画面と繋がって
+見えるようにするためです。サンプルの絵自体も8色ディザで描いてあるので、当時の画面に
+近い見え方になっています。
+
 ---
 
 ## 準備するもの
@@ -138,6 +163,36 @@ Two things make the look:
 
 The same effect is available three ways: as a PNG sequence, inside After Effects, and as
 RPG Maker plugins.
+
+### Samples
+
+![Appearing from black, then disappearing](output_sample/aqua88_anim.gif)
+
+**A picture rising out of a black screen and then leaving again** (640×400, 86 frames).
+For the first third only the blue plane is painted, so everything destined to be white
+rises as a **deep blue ghost**. Red then turns it purple and red, and green finally lands
+it on its real colours. **That colour progression is the heart of the effect** — it looks
+nothing like simply ramping up opacity.
+
+The disappearance is the **exact reverse** of the appearance: the plane that arrived first
+leaves last.
+
+![Compositing over a background](output_sample/darkness88_anim.gif)
+
+**A picture appearing on top of a background that is already on screen** (640×400, 43
+frames). The forest stays exactly as it is from beginning to end while only the character
+rises, plane by plane.
+
+This is the awkward part: a state where **the background shows through by different
+amounts per channel** — red and green still showing the forest while blue already shows
+the picture — cannot be expressed with a single alpha channel. So the compositing is
+split into **a multiply layer and an add layer**. Cells not yet painted are fully
+transparent, and once painted the result matches ordinary alpha compositing exactly, so
+it **starts and ends seamlessly**.
+
+In both samples the lattice is anchored to **the whole screen**, so the weave stays
+continuous with the screen wherever the artwork sits. The sample art itself is drawn with
+8-colour dithering, which keeps the look close to the original hardware.
 
 ## What you need
 
