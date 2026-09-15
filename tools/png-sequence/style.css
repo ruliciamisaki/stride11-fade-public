@@ -126,3 +126,9 @@ footer code{background:var(--sunken);padding:.1em .35em;font-size:.95em}
 
 /* 余りモードの行 */
 .field.inline{margin-top:.9rem;max-width:34rem}
+
+/* ---------- アルファ（透明部分）の行 ---------- */
+.alpha-row{display:flex;align-items:center;gap:.4rem;margin-top:.3rem;flex-wrap:wrap}
+.alpha-state{font-size:.74rem;color:var(--muted);flex:1 1 auto;min-width:8rem}
+.alpha-state.has{color:var(--ink-2)}
+.alpha-row .mini{padding:.15rem .5rem;font-size:.72rem}

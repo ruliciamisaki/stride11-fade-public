@@ -56,12 +56,19 @@ const els = {
   roBytes: $('roBytes'), roMs: $('roMs'),
   prefix: $('prefix'), digits: $('digits'), nameHint: $('nameHint'),
   transparent: $('transparent'), msgTrans: $('msgTrans'), slotTitleA: $('slotTitleA'),
+  composite: $('composite'), msgComposite: $('msgComposite'),
+  alphaStateA: $('alphaStateA'), alphaStateB: $('alphaStateB'),
+  btnMaskA: $('btnMaskA'), btnMaskB: $('btnMaskB'),
+  btnMaskClearA: $('btnMaskClearA'), btnMaskClearB: $('btnMaskClearB'),
+  fileMaskA: $('fileMaskA'), fileMaskB: $('fileMaskB'),
   btnDir: $('btnDir'), btnZip: $('btnZip'), btnStop: $('btnStop'), msgExport: $('msgExport'),
   progWrap: $('progWrap'), progBar: $('progBar'), progLabel: $('progLabel')
 };
 
 /* -------------------------------------------------------------- 状態 */
-let imgA = null, imgB = null;            // {w,h,data} 元画像
+let imgA = null, imgB = null;            // {w,h,data,hasAlpha} 元画像
+let maskA = null, maskB = null;          // {w,h,alpha,label} 別指定のアルファマスク
+let composite = false;                   // 合成するか
 let uidSeq = 0, bufSig = '';             // バッファ再構築の判定用
 let pattern = 1;
 let G = null;                            // ジオメトリ
@@ -90,8 +97,13 @@ function imageFromSource(src) {
       g.imageSmoothingEnabled = false;
       g.drawImage(im, 0, 0);
       const d = g.getImageData(0, 0, c.width, c.height);
-      for (let o = 3; o < d.data.length; o += 4) d.data[o] = 255;   // 不透明に固定
-      resolve({ w: c.width, h: c.height, data: d.data });
+      // アルファはそのまま残す。透明部分をどう扱うかは、
+      // 「合成する」と「透明で出力する」の設定しだいで後から決める
+      let hasAlpha = false;
+      for (let o = 3; o < d.data.length; o += 4) {
+        if (d.data[o] !== 255) { hasAlpha = true; break; }
+      }
+      resolve({ w: c.width, h: c.height, data: d.data, hasAlpha });
     };
     im.onerror = () => reject(new Error('画像を読み込めませんでした'));
     im.src = src;
@@ -106,6 +118,50 @@ async function loadFile(slot, file) {
   try {
     const img = await imageFromSource(url);
     setSlot(slot, img, file.name);
+  } catch (e) {
+    setMsg(els.msgImages, e.message, 'err');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/**
+ * アルファマスクを読み込む。
+ *
+ * jpg のように透明を持てない形式のための逃げ道。**白が不透明・黒が透明**として、
+ * 明度をそのままアルファに使う。マスク自身のアルファは見ない。
+ */
+function maskFromSource(src) {
+  return new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = im.naturalWidth; c.height = im.naturalHeight;
+      const g = c.getContext('2d', { willReadFrequently: true });
+      g.imageSmoothingEnabled = false;
+      g.drawImage(im, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      const alpha = new Uint8ClampedArray(c.width * c.height);
+      for (let i = 0, o = 0; i < alpha.length; i++, o += 4) {
+        alpha[i] = (d[o] * 299 + d[o + 1] * 587 + d[o + 2] * 114) / 1000;
+      }
+      resolve({ w: c.width, h: c.height, alpha });
+    };
+    im.onerror = () => reject(new Error('マスク画像を読み込めませんでした'));
+    im.src = src;
+  });
+}
+
+async function loadMask(slot, file) {
+  if (!file || !file.type.startsWith('image/')) {
+    return setMsg(els.msgImages, '画像ファイルではありません。', 'err');
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const m = await maskFromSource(url);
+    m.label = file.name; m.uid = ++uidSeq;
+    if (slot === 'A') maskA = m; else maskB = m;
+    refresh();
   } catch (e) {
     setMsg(els.msgImages, e.message, 'err');
   } finally {
@@ -210,9 +266,50 @@ const gcd = (a, b) => b ? gcd(b, a % b) : a;
 /* ========================================================================== *
  *  レンダラ
  * ========================================================================== */
+/**
+ * その画像の透明部分を決めて、バッファのアルファへ書き込む。
+ *
+ * 優先順位は **画像自身のアルファ → 別指定のマスク → 不透明**。
+ * jpg のように透明を持てない形式でも、マスクを渡せば透明として扱える。
+ */
+function resolveAlpha(buf, img, mask) {
+  if (img.hasAlpha) return;                       // 画像のアルファをそのまま使う
+  if (mask && mask.w === img.w && mask.h === img.h) {
+    for (let i = 0, o = 3; i < mask.alpha.length; i++, o += 4) buf[o] = mask.alpha[i];
+    return;
+  }
+  for (let o = 3; o < buf.length; o += 4) buf[o] = 255;   // 不透明として扱う
+}
+
+/**
+ * 2枚を互いの下に敷いて、どちらも不透明な絵にする。
+ *
+ *   開始画像 = A を B の上に乗せたもの
+ *   終了画像 = B を A の上に乗せたもの
+ *
+ * 終了画像だけに透明があれば、開始画像はそのまま・終了画像は「背景の上に絵が
+ * 乗った状態」になる。**背景の上に絵が出現する**形。
+ * 開始画像だけに透明があれば逆で、**合成された状態から絵が消えていく**形になる。
+ * 両方の透明が重なったところは、敷くものが無いので黒くなる。
+ */
+function compositeSources(a, b) {
+  const outA = new Uint8ClampedArray(a.length);
+  const outB = new Uint8ClampedArray(b.length);
+  for (let o = 0; o < a.length; o += 4) {
+    const aa = a[o + 3] / 255, ab = b[o + 3] / 255;
+    for (let c = 0; c < 3; c++) {
+      outA[o + c] = a[o + c] * aa + b[o + c] * ab * (1 - aa);
+      outB[o + c] = b[o + c] * ab + a[o + c] * aa * (1 - ab);
+    }
+    outA[o + 3] = 255; outB[o + 3] = 255;          // 合成後は不透明
+  }
+  a.set(outA); b.set(outB);
+}
+
 function prepareBuffers() {
   const W = G.W, H = G.H;
-  const sig = [imgA.uid, imgB.uid, pattern, els.dupLine.checked, W, H, transparent].join('|');
+  const sig = [imgA.uid, imgB.uid, maskA ? maskA.uid : 0, maskB ? maskB.uid : 0,
+    composite, pattern, els.dupLine.checked, W, H, transparent].join('|');
   if (sig === bufSig && cur && cur.length === W * H * 4) {
     rewind();                            // 素材は同じ。頭出しだけ
     return;
@@ -220,6 +317,13 @@ function prepareBuffers() {
   bufSig = sig;
   srcA = new Uint8ClampedArray(imgA.data);
   srcB = new Uint8ClampedArray(imgB.data);
+  resolveAlpha(srcA, imgA, maskA);
+  resolveAlpha(srcB, imgB, maskB);
+  if (composite) compositeSources(srcA, srcB);
+  // 開始画像のアルファは、ここから先は使わない（合成に使い終わっている）。
+  // cur は srcA から作るので、ここで潰しておかないと出力にアルファが残り、
+  // 「RGB は終了画像・アルファは開始画像」という半端な絵になる
+  for (let o = 3; o < srcA.length; o += 4) srcA[o] = 255;
   if (pattern === 1 && els.dupLine.checked) {
     duplicateLines(srcA, W, H);
     duplicateLines(srcB, W, H);
@@ -377,7 +481,10 @@ function renderPatternList() {
 
 function refresh() {
   transparent = els.transparent.checked;
+  composite = els.composite.checked && !transparent;
   updateTransparentUI();
+  updateAlphaUI();
+  updateCompositeUI();
   els.btnSwap.disabled = !(imgA && imgB);
   renderPatternList();
 
@@ -392,6 +499,15 @@ function refresh() {
     els.geo.textContent = '—';
     setReady(false);
     return;
+  }
+  for (const [slot, img, mask] of [['開始', imgA, maskA], ['終了', imgB, maskB]]) {
+    if (mask && !img.hasAlpha && (mask.w !== img.w || mask.h !== img.h)) {
+      setMsg(els.msgImages, `${slot}画像のマスクのサイズが違います`
+        + `（画像 ${img.w}×${img.h} / マスク ${mask.w}×${mask.h}）。同じサイズにしてください。`, 'err');
+      els.geo.textContent = '—';
+      setReady(false);
+      return;
+    }
   }
   const err = patternError(pattern, imgA.w, imgA.h);
   if (err) {
@@ -469,6 +585,66 @@ function updateNameHint() {
  * 透明モードでは開始画像を出力に使わない。何に重ねるとどう見えるかを
  * 確かめるための背景として残してあるので、呼び名をそう変える。
  */
+/** 各スロットの「透明部分」の行を書き直す */
+function updateAlphaUI() {
+  for (const slot of ['A', 'B']) {
+    const img = slot === 'A' ? imgA : imgB;
+    const mask = slot === 'A' ? maskA : maskB;
+    const state = els['alphaState' + slot];
+    const clear = els['btnMaskClear' + slot];
+    const pick = els['btnMask' + slot];
+
+    clear.hidden = !mask;
+    pick.textContent = mask ? 'マスクを変える…' : 'マスク…';
+    pick.disabled = !!(img && img.hasAlpha);
+    state.classList.toggle('has', !!(img && img.hasAlpha) || !!mask);
+
+    if (!img) { state.textContent = '透明部分: —'; continue; }
+    if (img.hasAlpha) {
+      state.textContent = '透明部分: 画像にあります' + (mask ? '（マスクは使いません）' : '');
+    } else if (mask) {
+      state.textContent = (mask.w === img.w && mask.h === img.h)
+        ? `透明部分: マスク ${mask.label}`
+        : `⚠ マスクのサイズが画像と違います（${mask.w}×${mask.h}）`;
+    } else {
+      state.textContent = '透明部分: なし（不透明として扱います）';
+    }
+  }
+}
+
+/** 「合成する」の説明を、いま置かれている2枚に合わせて書く */
+function updateCompositeUI() {
+  const on = els.composite.checked;
+  // 合成は「背景を含めて焼く」、透明出力は「背景を含めない」。狙いが正反対なので
+  // 片方を入れたらもう片方は選べなくする
+  els.composite.disabled = els.transparent.checked;
+  els.transparent.disabled = on;
+
+  if (!imgA || !imgB) {
+    setMsg(els.msgComposite, '透明部分の下に、もう一方の画像を敷いた状態でフェードします。');
+    return;
+  }
+  const ta = hasTransparency(imgA, maskA), tb = hasTransparency(imgB, maskB);
+  let text;
+  if (!ta && !tb) {
+    text = 'どちらの画像にも透明部分がありません。合成しても見た目は変わりません。';
+  } else if (tb && !ta) {
+    text = '終了画像の透明部分に開始画像が透けます。背景の上に絵が出現する形です。';
+  } else if (ta && !tb) {
+    text = '開始画像の透明部分に終了画像が透けます。合成された状態から、絵が消えていく形です。';
+  } else {
+    text = '両方に透明部分があります。どちらも透明なところは黒くなります。';
+  }
+  setMsg(els.msgComposite, on ? text : '入れると: ' + text, on ? 'ok' : '');
+}
+
+/** その画像が透明部分を持つか（画像自身のアルファ、または有効なマスク） */
+function hasTransparency(img, mask) {
+  if (!img) return false;
+  if (img.hasAlpha) return true;
+  return !!(mask && mask.w === img.w && mask.h === img.h);
+}
+
 function updateTransparentUI() {
   const on = els.transparent.checked;
   els.slotTitleA.textContent = on ? '背景（プレビュー用）' : '開始画像';
@@ -767,7 +943,8 @@ document.querySelectorAll('[data-fill]').forEach(btn => {
 
 els.btnSwap.addEventListener('click', () => {
   if (!imgA || !imgB) return;
-  const a = imgA, b = imgB;
+  const a = imgA, b = imgB, ma = maskA, mb = maskB;
+  maskA = mb; maskB = ma;                 // マスクも一緒に入れ替える
   setSlot('A', b, b.label); setSlot('B', a, a.label);
 });
 
@@ -775,6 +952,17 @@ els.btnSwap.addEventListener('click', () => {
   els[k].addEventListener('change', refresh);
 });
 els.transparent.addEventListener('change', refresh);
+els.composite.addEventListener('change', refresh);
+
+for (const slot of ['A', 'B']) {
+  els['btnMask' + slot].addEventListener('click', () => els['fileMask' + slot].click());
+  els['fileMask' + slot].addEventListener('change', e => loadMask(slot, e.target.files[0]));
+  els['btnMaskClear' + slot].addEventListener('click', () => {
+    if (slot === 'A') maskA = null; else maskB = null;
+    els['fileMask' + slot].value = '';
+    refresh();
+  });
+}
 els.stride.addEventListener('input', refresh);
 els.frames.addEventListener('input', () => { if (G) showHints(getStride()); });
 ['prefix', 'digits'].forEach(k => els[k].addEventListener('input', updateNameHint));
@@ -793,6 +981,8 @@ els.btnStop.addEventListener('click', () => { aborting = true; });
 /* -------------------------------------------------------------- 初期化 */
 renderPatternList();
 updateTransparentUI();
+updateAlphaUI();
+updateCompositeUI();
 setReady(false);
 if (!window.showDirectoryPicker) {
   setMsg(els.msgExport, 'このブラウザは「フォルダへ直接書き出し」に未対応です（Chrome / Edge 推奨）。ZIP をご利用ください。', 'warn');

@@ -34,6 +34,12 @@
       </label>
       <input type="file" id="fileA" accept="image/*" hidden>
       <div class="slot-meta" id="metaA">未読み込み</div>
+      <div class="alpha-row">
+        <span class="alpha-state" id="alphaStateA">透明部分: —</span>
+        <button type="button" class="mini" id="btnMaskA">マスク…</button>
+        <button type="button" class="mini" id="btnMaskClearA" hidden>✕</button>
+        <input type="file" id="fileMaskA" accept="image/*" hidden>
+      </div>
     </div>
 
     <div class="arrow" aria-hidden="true">→</div>
@@ -52,12 +58,25 @@
       </label>
       <input type="file" id="fileB" accept="image/*" hidden>
       <div class="slot-meta" id="metaB">未読み込み</div>
+      <div class="alpha-row">
+        <span class="alpha-state" id="alphaStateB">透明部分: —</span>
+        <button type="button" class="mini" id="btnMaskB">マスク…</button>
+        <button type="button" class="mini" id="btnMaskClearB" hidden>✕</button>
+        <input type="file" id="fileMaskB" accept="image/*" hidden>
+      </div>
     </div>
 
     <div class="swap">
       <button type="button" id="btnSwap" class="mini">⇄ 入れ替え</button>
     </div>
   </div>
+
+  <label class="check">
+    <input type="checkbox" id="composite">
+    合成する（透明部分の下に、もう一方の画像を敷く）
+  </label>
+  <p class="msg" id="msgComposite"></p>
+
   <p class="msg" id="msgImages"></p>
 </section>
 

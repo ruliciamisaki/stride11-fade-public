@@ -21,6 +21,8 @@ HTML + CSS + JavaScript だけでできていて、外部ライブラリは使�
 - **画像2枚** … 開始画像と終了画像。同じ大きさにしてください
   - 「黒からのフェードイン」にしたいなら、開始画像を黒一色にします
   - フェードアウトは2枚を入れ替えるだけです
+  - **透明部分を持つ画像も使えます**（後述の「合成する」）。jpg のように透明を
+    持てない形式なら、**アルファマスク画像**を別に渡せます
 - インストールも通信も不要です。ファイルはブラウザの中だけで扱います
 
 ```
@@ -78,6 +80,36 @@ tools/png-sequence/
 | 出力フレーム数 | 43 | 当時の速度で再生するときのfpsを自動表示（既定で約30fps） |
 | 1パスの実時間 | 43.5 ms | 実測 43.1〜44.5 ms。再生fpsの目安計算に使います |
 | パス単位でしか変化させない | off | onにすると掃引の途中を描かず、パス完了状態だけを出力します |
+
+### 透明部分を使う（合成する）
+
+**背景の上にキャラクターだけを出したい**、あるいは**その逆で消したい**ときは、
+画像の透明部分を使います。「合成する」を入れると、**透明部分の下にもう一方の画像が
+敷かれた状態**でフェードします。
+
+| 置き方 | 出てくるもの |
+|---|---|
+| 開始画像＝背景（不透明） / 終了画像＝キャラ（透明あり） | 背景はそのまま、**キャラが出現する** |
+| 開始画像＝キャラ（透明あり） / 終了画像＝背景（不透明） | 合成された状態から、**キャラが消えていく** |
+
+どちらに置いたかで向きが決まるので、**「⇄ 入れ替え」を押せば出現と消滅が入れ替わります**。
+マスク画像も一緒に入れ替わります。
+
+両方に透明部分があって、それが重なっているところは**黒**になります（敷くものが無いため）。
+
+#### 透明部分をどこから取るか
+
+各スロットの「透明部分:」の行に、いま何が使われているかが出ます。優先順位は次のとおりです。
+
+1. **画像自身のアルファ**（透明を持つ PNG など）
+2. 無ければ、**別に指定したアルファマスク画像**（「マスク…」から選ぶ）
+3. どちらも無ければ**不透明**として扱う
+
+マスクは **白が不透明・黒が透明**のグレースケールです。画像と同じ大きさにしてください。
+画像自身がアルファを持っているときはマスクを使わないので、ボタンも押せなくなります。
+
+「合成する」と「透明で出力する」は**狙いが正反対**（前者は背景を含めて焼く、後者は
+背景を含めない）なので、**同時には使えません**。片方を入れるともう片方は選べなくなります。
 
 ### 透明で出力する（重ね合わせ用）
 
@@ -159,6 +191,24 @@ s       = (residue + a / N) / stride    ← 1プレーン内の正規化順序 �
 1ライン80バイトで `80 mod 11 = 3` なので、**同じパスで塗られるバイトは1ライン
 下がるごとに3バイト＝24ドット右へずれます**。これが斜めの織り目の正体です。
 
+### 合成のしかた
+
+「合成する」は、2枚を**互いの下に敷く**だけです。開始画像を `A`（アルファ `a`）、
+終了画像を `B`（アルファ `b`）として、
+
+```
+開始画像 = A×a + B×b×(1−a)
+終了画像 = B×b + A×a×(1−b)
+```
+
+終了画像だけに透明があれば `a = 1` なので、開始画像は `A` のまま、終了画像は
+`B×b + A×(1−b)` すなわち**背景の上に絵が乗った状態**になります。開始画像だけに
+透明があれば、その逆です。**どちらの向きも同じ式で出る**ので、入れ替えるだけで
+出現と消滅が切り替わります。両方が透明なところは `A×0 + B×0 = 0` で黒です。
+
+合成した結果は不透明なので、そのあとのフェードは通常どおり「各バイトの各チャンネルが
+開始画像の値から終了画像の値へ切り替わる」だけになります。
+
 ### なぜ透明出力が2枚に分かれるのか
 
 **チャンネルごとの透明度は、1枚のRGBA画像では表現できません。** アルファは1本しか
@@ -197,6 +247,16 @@ s       = (residue + a / N) / stride    ← 1プレーン内の正規化順序 �
 - ZIP の中身が `mul/fade_0000.png` `add/fade_0000.png` … の形で並ぶ
 - オフのときは2枚ぶんのバッファを確保しない
 
+合成とアルファの扱いは、ブラウザ上で次を確認しています。
+
+- 合成した最終フレームが、別に計算したアルファ合成の結果と**全画素一致**（640×400 / 256,000画素）
+- 先頭フレームが背景そのものと全画素一致
+- 入れ替えたとき、先頭が合成結果・最後が背景になる（消滅の向き）
+- **アルファマスク経由の結果が、画像自身のアルファを使った結果と全画素一致**
+- 手元の素材では、マスク画像の明度と画像のアルファが 256,000 画素すべてで一致
+- 出力はどのモードでも不透明（半端なアルファが残らない）
+- 透明出力モードで `mul = 255 − α` / `add = 絵 × α` が全画素で成り立つ
+
 演出そのものの解析は、素材の権利の都合で公開していません。
 
 ---
@@ -225,6 +285,8 @@ Plain HTML, CSS and JavaScript. No external libraries.
 - **Two images** of the same size, the start and the end of the fade
   - For a fade in from black, make the start image solid black
   - For a fade out, just swap the two
+  - **Images with transparency work too** (see "Using transparency"). For formats that
+    cannot carry alpha, such as jpg, you can supply a separate **alpha mask image**
 - Nothing to install, no network access. Files never leave your browser
 
 ## How to use
@@ -274,6 +336,39 @@ modes give identical output.** 16:10 sources (1280×800 / 1920×1200 / 2560×160
 | Frame count | 43 | The tool shows the fps needed to play back at the original speed (about 30fps by default) |
 | Milliseconds per pass | 43.5 | Measured 43.1–44.5 ms; used for that fps estimate |
 | Only change on pass boundaries | off | When on, only completed passes are drawn, never a partial sweep |
+
+### Using transparency (compositing)
+
+To bring **only a character in over a background** — or the reverse, to take one away —
+use the images' transparency. Tick **"composite"** and the fade runs with **the other
+image laid underneath the transparent parts**.
+
+| How you place them | What you get |
+|---|---|
+| start = background (opaque) / end = character (with alpha) | the background stays, **the character appears** |
+| start = character (with alpha) / end = background (opaque) | starting from the composited state, **the character leaves** |
+
+The direction follows from which slot each image is in, so **"⇄ swap" turns an appearance
+into a disappearance**. Mask images are swapped along with them.
+
+Where both images are transparent in the same place, the result is **black** (there is
+nothing left to lay underneath).
+
+#### Where transparency comes from
+
+Each slot shows what is currently in use on its "transparency:" line. The order of
+precedence is:
+
+1. **The image's own alpha** (a PNG with transparency, say)
+2. Failing that, **a separately supplied alpha mask image** (pick one with "mask…")
+3. Failing both, the image is treated as **opaque**
+
+A mask is greyscale, **white for opaque and black for transparent**, and must be the same
+size as its image. When the image already carries alpha the mask is not used, and the
+button is disabled.
+
+"Composite" and "transparent output" have **opposite intents** — one bakes the background
+in, the other leaves it out — so **they cannot both be on**. Ticking one disables the other.
 
 ### Transparent output (for compositing)
 
@@ -355,6 +450,25 @@ s       = (residue + a / N) / stride    normalised order within one plane, in [0
 With 80 bytes per line, `80 mod 11 = 3`, so **bytes painted in the same pass shift 3 bytes
 (24 dots) to the right on every line down**. That is where the diagonal weave comes from.
 
+### How compositing works
+
+"Composite" simply lays each image under the other. With the start image `A` (alpha `a`)
+and the end image `B` (alpha `b`):
+
+```
+start = A×a + B×b×(1−a)
+end   = B×b + A×a×(1−b)
+```
+
+If only the end image has transparency then `a = 1`, so the start stays `A` and the end
+becomes `B×b + A×(1−b)` — **the picture sitting on the background**. If only the start
+image has transparency, it is the other way round. **Both directions fall out of the same
+formula**, which is why swapping the slots switches between appearing and disappearing.
+Where both are transparent, `A×0 + B×0 = 0`, i.e. black.
+
+The composited result is opaque, so the fade itself is then the ordinary one: each plane
+of each byte switches from the start value to the end value at its scheduled time.
+
 ### Why transparent output needs two layers
 
 **Per-channel transparency cannot be stored in a single RGBA image.** There is only one
@@ -393,5 +507,15 @@ opaque pixels:
 - Exported PNGs read back byte-identical to the buffers they came from
 - ZIP entries are laid out as `mul/fade_0000.png`, `add/fade_0000.png`, …
 - With the option off, the second set of buffers is never allocated
+
+Compositing and alpha handling, checked in the browser:
+
+- The composited last frame matches an independently computed alpha composite **on every pixel** (640×400, 256,000 pixels)
+- The first frame matches the background exactly
+- After swapping, the first frame is the composite and the last is the background (the disappearing direction)
+- **Going through an alpha mask gives pixel-identical results to using the image's own alpha**
+- For the test material, the mask's luminance equalled the image's alpha on all 256,000 pixels
+- Output is opaque in every mode (no stray alpha is left behind)
+- In transparent output mode, `mul = 255 − α` and `add = picture × α` hold on every pixel
 
 The analysis itself is not published, since the source material is not ours to redistribute.
