@@ -42,6 +42,20 @@
 見えるようにするためです。サンプルの絵自体も8色ディザで描いてあるので、当時の画面に
 近い見え方になっています。
 
+![背景も立ち絵も、出現から消滅まで](output_sample/holo3rd.gif)
+
+**上の2つを組み合わせたもの**です（640×400・300フレーム・24秒）。After Effects の中で、
+画面全体にかける使い方と、背景の上に重ねる使い方を重ねて作っています。
+
+1. まず**背景の壁が出現**します。黄色い壁には青が入っていないので、**青プレーンの前半は
+   何も出ません**。赤が乗って真っ赤になり、緑が入って本来の黄色に着地します
+2. 次に**立ち絵が1枚ずつ**、背景の上に重なって出てきます。背景は最後まで動きません
+3. 最後に**画面全体が消えます**。出現の逆再生なので、緑が抜けて赤へ、赤が抜けて青へ、
+   最後に黒へ落ちます
+
+格子は**画面全体にアンカーされている**ので、背景と立ち絵で**織り目が互いに揃います**。
+別々に作ったものを重ねても、1枚の画面が塗られていくように見えるのはこのためです。
+
 ---
 
 ## 準備するもの
@@ -193,6 +207,21 @@ it **starts and ends seamlessly**.
 In both samples the lattice is anchored to **the whole screen**, so the weave stays
 continuous with the screen wherever the artwork sits. The sample art itself is drawn with
 8-colour dithering, which keeps the look close to the original hardware.
+
+![Background and characters, from arrival to departure](output_sample/holo3rd.gif)
+
+**The two above, combined** (640×400, 300 frames, 24 seconds). Built inside After Effects
+by stacking the whole-screen use and the compositing use.
+
+1. First **the brick wall arrives**. A yellow wall carries no blue, so **nothing shows
+   during the blue third**; red then floods it, and green lands it on its real yellow
+2. Then **the characters arrive one at a time** over that background, which never moves again
+3. Finally **the whole screen leaves**. Being the reverse of the arrival, green drops out
+   to red, red drops out to blue, and blue falls to black
+
+Because the lattice is anchored to **the whole screen**, the weave of the background and
+of each character line up. That is why separately built pieces still read as one screen
+being painted.
 
 ## What you need
 

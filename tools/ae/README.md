@@ -60,10 +60,25 @@ tools/ae/
 1. 元レイヤーと重ね合わせレイヤーが載ったコンポを開く
 2. その2枚を選択する（**下に来るほうが元画像**）
 3. ファイル > スクリプト > スクリプトファイルを実行… → `stride11_fade.jsx`
-4. リビールマップ PNG を指定し、向き・プレーン順・尺を選んで「組み立てる」
+4. リビールマップ PNG を指定し、向き・プレーン順・尺・開始時刻を決めて「組み立てる」
 
-でき上がった `Stride11 Fade CTRL` の **Fade Progress（0→100）** がフェードの進行です。
-これをアニメートすれば、速度も止め方も自由に変えられます。
+ダイアログの入力欄は次の意味です。
+
+| 欄 | 単位 | 内容 |
+|---|---|---|
+| 尺 | **秒** | フェードが始まってから終わるまでの長さ。実機相当は 1.44 |
+| 開始時刻 | **秒** | **コンポ上の何秒からフェードを始めるか。** 0 なら先頭から。小数も使えます（3 と入れると 3.00 秒〜4.44 秒） |
+
+フレーム数ではなく**秒**です。コンポのフレームレートに関係なく同じ結果になります。
+
+
+でき上がった **`Stride11 Fade CTRL` コンポ**を開き、その中の `CTRL` にある
+**Fade Progress（0→100）** がフェードの進行です。これをアニメートすれば、速度も
+止め方も自由に変えられます。
+
+スライダーを**別のコンポに置いてある**のは、**プリコンポーズで壊れないようにする**
+ためです（下の「技術的な話」を参照）。元のコンポにも同じ名前で置いてありますが、
+そちらは表示 OFF の参照用で、ダブルクリックすると操作用コンポが開きます。
 
 ダイアログの**プレーン順**は生成ツールと同じ4種類です。
 
@@ -91,6 +106,13 @@ tools/ae/
 `Ctrl+Z` 1回で取り消せます（読み込んだ `revealmap` フッテージだけはプロジェクト
 パネルに残るので、不要なら手で消してください）。
 
+**「エクスプレッションが無効です」「"Stride11 Fade CTRL" という名前のレイヤーが
+見つからない」**と出る場合は、**組み立てる前の古い版**で組んだものです。昔はスライダーを
+元のコンポの中のヌルに置いていたので、プリコンポーズするとヌルが新しいコンポへ移って
+しまい、参照が切れていました。いまの版は操作用コンポを別に作るので起きません。
+作り直すのが早いですが、手で直すなら各 `MASK_p` のしきい値の式で、`comp("…")` の
+中身を**ヌルが実際にいるコンポの名前**（プリコンポーズ後の名前）に書き換えてください。
+
 **フェード完了後も画面上端に黒い破片が残る**場合は、マップが古い可能性があります。
 明度 0 を含む古いマップは、AE の「しきい値」の都合でその部分が永久に開きません。
 マップを書き出し直してください（下の「技術的な話」を参照）。
@@ -98,8 +120,11 @@ tools/ae/
 ### 手で組む場合の構造
 
 ```
+[Stride11 Fade CTRL]  … 操作用の小さなコンポ（ここだけを動かす）
+  CTRL (ヌル) ─ スライダー制御 "Fade Progress" 0→100
+
 [元のコンポ]
-  Stride11 Fade CTRL (ヌル) ─ スライダー制御 "Fade Progress" 0→100
+  Stride11 Fade CTRL  上のコンポを置いたもの。ビデオ OFF
   Stride11 Fade OUT (平面)  ─ Set Channels
         赤       ← MIX_1 の 赤
         緑       ← MIX_2 の 緑
@@ -135,7 +160,7 @@ MIX_0 = 青プレーン、MIX_1 = 赤、MIX_2 = 緑。
 しきい値のレベルに：
 
 ```javascript
-var tau  = comp("コンポ名").layer("Stride11 Fade CTRL").effect("Fade Progress")(1) / 100;
+var tau  = comp("Stride11 Fade CTRL").layer("CTRL").effect("Fade Progress")(1) / 100;
 var prog = Math.max(0, Math.min(1, 3 * tau - 0));   // ← 末尾の 0 をプレーン番号に
 1 * prog;                                            // ← 値域。既定値 0.5 なら 1、127 なら 255
 ```
@@ -205,6 +230,29 @@ mask_p = ( v < 255 × prog_p )
 v=0 を含む古いマップを使うと、**フェード完了後も画面上端に黒い破片が残ります**
 （v=0 は画面の一番上の数行にしか存在しないため、そこだけに出ます）。v=1 は正常に
 開くことを確認済みなので、マップが 0 を出さなければ起きません。
+
+### スライダーを別コンポに置いてある理由
+
+**プリコンポーズで式が切れないようにするため**です。
+
+しきい値の式は MIX コンポの中にあり、スライダーは別のコンポにあります。コンポをまたぐ
+参照は名前でしか書けません。ここで、スライダーを**元のコンポのヌル**に置いていると、
+ユーザーがそのコンポでプリコンポーズした瞬間に**ヌルが新しいコンポへ移動**します。
+元のコンポは名前こそ残りますが、その中にヌルはもう無いので、
+
+```
+Error: 「Stride11 Fade CTRL」という名前のレイヤーが見つからないか、存在しません
+```
+
+となって3プレーンぶん全部止まります。**コンポはプリコンポーズで移動しない**ので、
+スライダーを専用コンポに入れて `comp("Stride11 Fade CTRL")` と書けば、元のコンポで
+何をしようと参照は生きたままです。
+
+同じ名前のコンポが既にあるときは `Stride11 Fade CTRL 2` のように番号を足します。
+`comp("名前")` は名前で引くので、同名のコンポが2つあるとどちらを指すか決まらないためです。
+
+キーフレームで駆動した場合は、そもそもコンポをまたぐ参照が無い（しきい値に直接キーが
+打たれる）ので、この問題は起きません。
 
 ### 格子はコンポジションにアンカーされる
 
@@ -369,10 +417,25 @@ Reveal maps are not kept in the repository — **export one each time you need i
 1. Open the comp containing your base layer and overlay layer
 2. Select those two layers (**the lower one is the base**)
 3. File > Scripts > Run Script File… → `stride11_fade.jsx`
-4. Point it at the reveal map PNG, choose direction, plane order and duration, and build
+4. Point it at the reveal map PNG, choose direction, plane order, duration and start time,
+   and build
 
-The resulting `Stride11 Fade CTRL` has **Fade Progress (0→100)**, which drives the whole
-fade. Animate it however you like.
+The dialog's fields:
+
+| Field | Unit | Meaning |
+|---|---|---|
+| Duration | **seconds** | How long the fade takes from start to finish. 1.44 matches the original |
+| Start at | **seconds** | **Where on the comp timeline the fade begins.** 0 is the start of the comp. Decimals are fine (3 runs from 3.00s to 4.44s) |
+
+Both are **seconds**, not frames, so the result does not depend on the comp's frame rate.
+
+
+Open the resulting **`Stride11 Fade CTRL` comp** and animate **Fade Progress (0→100)**
+on the `CTRL` layer inside it; that drives the whole fade.
+
+The slider lives in **a comp of its own** so that **precomposing cannot break it** (see
+"How it works"). A layer of the same name is also placed in your comp with video off;
+double-clicking it opens the control comp.
 
 The **plane order** in the dialog offers the same four choices as the generator:
 
@@ -400,6 +463,13 @@ A diagnostic dialog you can copy from appears after the run. If it fails, one `C
 undoes everything (only the imported `revealmap` footage stays in the Project panel;
 delete it by hand if you don't want it).
 
+If you get **"expression disabled" / "no layer named Stride11 Fade CTRL"**, the rig was
+built by an **older version** of the script. It used to put the slider on a null inside
+your comp, so precomposing moved the null into the new comp and the reference broke. The
+current version builds a separate control comp instead. Rebuilding is quickest; to repair
+by hand, edit each `MASK_p` threshold expression so that `comp("…")` names **the comp the
+null actually ended up in**.
+
 If **black fragments remain along the top of the screen after the fade finishes**, your
 map is probably an old one. Maps containing luminance 0 never open those cells, because
 of how AE's Threshold behaves. Export the map again (see "How it works").
@@ -407,8 +477,11 @@ of how AE's Threshold behaves. Export the map again (see "How it works").
 ### Building it by hand
 
 ```
+[Stride11 Fade CTRL]  … a small comp of its own; this is what you animate
+  CTRL (null) ─ Slider Control "Fade Progress" 0→100
+
 [your comp]
-  Stride11 Fade CTRL (null)  ─ Slider Control "Fade Progress" 0→100
+  Stride11 Fade CTRL  the comp above, placed as a layer. Video off
   Stride11 Fade OUT (solid)  ─ Set Channels
         Red    ← MIX_1 Red
         Green  ← MIX_2 Green
@@ -444,7 +517,7 @@ Apply one **Threshold** (Stylize) to the map layer, and set the overlay's track 
 On the Threshold's Level:
 
 ```javascript
-var tau  = comp("comp name").layer("Stride11 Fade CTRL").effect("Fade Progress")(1) / 100;
+var tau  = comp("Stride11 Fade CTRL").layer("CTRL").effect("Fade Progress")(1) / 100;
 var prog = Math.max(0, Math.min(1, 3 * tau - 0));   // ← the trailing 0 is the plane index
 1 * prog;                                            // ← the range: 1 if default is 0.5, 255 if 127
 ```
@@ -514,6 +587,29 @@ black.** The mask is `v < L`, so v=0 ought to open as soon as `L ≥ 1` — meas
 not. Using an old map that contains 0 leaves **black fragments along the top of the screen
 after the fade completes** (v=0 only exists in the topmost few rows, which is why they
 appear only there). v=1 opens correctly, so keeping 0 out of the map avoids the problem.
+
+### Why the slider lives in its own comp
+
+**So that precomposing cannot break the expressions.**
+
+The threshold expressions live inside the MIX comps while the slider lives elsewhere, and
+a cross-comp reference can only be written by name. With the slider on a null inside your
+comp, precomposing moves **the null** into the new comp. Your comp keeps its name but no
+longer contains that layer, so you get
+
+```
+Error: no layer named "Stride11 Fade CTRL" found
+```
+
+on all three planes. **Comps are not moved by precomposing**, so putting the slider in a
+comp of its own and writing `comp("Stride11 Fade CTRL")` keeps the reference alive no
+matter what you do in your comp.
+
+If a comp of that name already exists, a number is appended (`Stride11 Fade CTRL 2`),
+because `comp("name")` resolves by name and two comps sharing one name would be ambiguous.
+
+Keyframe mode never had this problem: it writes keys straight onto the threshold, so there
+is no cross-comp reference at all.
 
 ### The grid is anchored to the composition
 

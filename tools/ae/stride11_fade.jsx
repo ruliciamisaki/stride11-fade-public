@@ -248,10 +248,18 @@
   ]);
   planesDd.selection = 0;
   var r2 = g2.add('group');
-  r2.add('statictext', undefined, '尺 (秒)');
+  r2.spacing = 10;
+  /* ラベルの幅は明示する。ScriptUI は日本語のラベルを実際より狭く見積もることが
+     あり、自動まかせだと「開始時刻 (秒)」が「開始時刻 (」で切れる */
+  var durLbl = r2.add('statictext', undefined, '尺 (秒)');
+  durLbl.preferredSize.width = 60;
   var durTxt = r2.add('edittext', undefined, '1.44'); durTxt.characters = 6;
-  r2.add('statictext', undefined, '  開始時刻 (秒)');
+  var startLbl = r2.add('statictext', undefined, '開始時刻 (秒)');
+  startLbl.preferredSize.width = 110;
   var startTxt = r2.add('edittext', undefined, '0'); startTxt.characters = 6;
+  var startHint = g2.add('statictext', undefined,
+    '開始時刻はコンポ上の秒。0 は先頭。小数可（3 なら 3.00〜4.44 秒）');
+  startHint.preferredSize.width = 600;
   var rdir = g2.add('group');
   rdir.add('statictext', undefined, '向き');
   var dirDd = rdir.add('dropdownlist', undefined, ['出現（フェードイン）', '消滅（フェードアウト）']);
@@ -315,6 +323,23 @@
     return null;
   }
 
+  /**
+   * まだ使われていないコンポ名を返す。
+   * 同じ名前のコンポが2つあると comp("名前") がどちらを指すか決まらないため。
+   */
+  function uniqueCompName(base) {
+    var used = {};
+    for (var i = 1; i <= app.project.numItems; i++) {
+      var it = app.project.item(i);
+      if (it instanceof CompItem) used[String(it.name)] = true;
+    }
+    if (!used[base]) return base;
+    for (var n = 2; n < 1000; n++) {
+      if (!used[base + ' ' + n]) return base + ' ' + n;
+    }
+    return base + ' ' + (new Date()).getTime();
+  }
+
   /* ---------------------------------------------------------------- 実行 */
   var failed = false;
   app.beginUndoGroup(SCRIPT);
@@ -338,10 +363,21 @@
       L('⚠ マップがコンポと違うサイズです。コンポと同じサイズで書き出し直してください。');
     }
 
-    /* --- 操作用ヌル ----------------------------------------------------- */
-    var ctrl = comp.layers.addNull(comp.duration);
-    ctrl.name = 'Stride11 Fade CTRL';
-    ctrl.enabled = false;
+    /* --- 操作用コンポ ---------------------------------------------------
+     *
+     * スライダーは**専用のコンポを作ってその中に置く**。マスターコンポの中に
+     * 置くと、ユーザーがプリコンポーズしたときにヌルが新しいコンポへ移って
+     * しまい、MIX コンポ側の式が「レイヤーが見つからない」で止まる。
+     * コンポはプリコンポーズでは移動しないので、コンポ名で指せば壊れない。
+     *
+     * マスターコンポにも（表示オフで）置いておく。プロジェクトの整理で消えず、
+     * タイムラインからダブルクリックで開けるようにするため。
+     */
+    var ctrlName = uniqueCompName('Stride11 Fade CTRL');
+    var ctrlComp = app.project.items.addComp(
+      ctrlName, 100, 100, comp.pixelAspect, comp.duration, comp.frameRate);
+    var ctrl = ctrlComp.layers.addNull(comp.duration);
+    ctrl.name = 'CTRL';
     var slider = addEffectAny(ctrl, ['ADBE Slider Control'], 'スライダー制御');
     slider.name = 'Fade Progress';
     var sliderProp = byMatch(slider, 'ADBE Slider Control-0001') || firstAnimatableOneD(slider);
@@ -352,12 +388,16 @@
     for (var k = 1; k <= sliderProp.numKeys; k++) {
       try { sliderProp.setInterpolationTypeAtKey(k, KeyframeInterpolationType.LINEAR, KeyframeInterpolationType.LINEAR); } catch (e) {}
     }
+    var ctrlRef = comp.layers.add(ctrlComp);
+    ctrlRef.name = ctrlName;
+    ctrlRef.enabled = false;
+    L('操作用コンポ: "' + ctrlName + '"（この中の CTRL を動かします）');
     L('Fade Progress: ' + startAt + 's → ' + (startAt + duration) + 's');
     L(fadeOut ? '向き: 消滅（出現の逆再生）' : '向き: 出現');
     // プロパティは名前ではなくインデックスで参照する。
     // 表示名は言語版で変わるため（日本語版のスライダーは "Slider" ではなく「スライダー」）。
-    var compRef = String(comp.name).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    var CTRL_EXPR = 'comp("' + compRef + '").layer("Stride11 Fade CTRL").effect("Fade Progress")(1)';
+    var compRef = String(ctrlName).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    var CTRL_EXPR = 'comp("' + compRef + '").layer("CTRL").effect("Fade Progress")(1)';
 
     /* --- プレーンごとの MIX コンポ -------------------------------------- */
     var mixComps = [];
@@ -478,7 +518,8 @@
     ovlLayer.enabled = false;
     L('元の 2 レイヤーはビデオ OFF にしました（中身は MIX コンポ内にあります）');
     L('');
-    L('完了。"Stride11 Fade CTRL" の Fade Progress (0→100) がフェードの進行です。');
+    L('完了。操作用コンポ "' + ctrlName + '" を開いて、CTRL の Fade Progress (0→100) を');
+    L('動かすとフェードが進みます。このコンポはプリコンポーズしても壊れません。');
     L('※ 動きが直線的でないと感じたら、プロジェクト設定 > カラー > 作業用スペースを');
     L('   「なし」にするか、revealmap フッテージのカラープロファイル解釈を合わせてください。');
 

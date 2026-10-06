@@ -53,9 +53,23 @@ tools/ae-en/
 6. 元レイヤーと重ね合わせレイヤーが載ったコンポを開き、その2枚を選択
    （**下に来るほうが元画像**）
 7. File > Scripts > Run Script File… → `stride11_fade.jsx`
-8. マップ PNG・向き・プレーン順・尺を指定して Build
+8. マップ PNG・向き・プレーン順・尺・開始時刻を指定して Build
 
-でき上がった `Stride11 Fade CTRL` の **Fade Progress（0→100）** がフェードの進行です。
+ダイアログの入力欄は次の意味です。
+
+| 欄 | 単位 | 内容 |
+|---|---|---|
+| 尺 | **秒** | フェードが始まってから終わるまでの長さ。実機相当は 1.44 |
+| 開始時刻 | **秒** | **コンポ上の何秒からフェードを始めるか。** 0 なら先頭から。小数も使えます（3 と入れると 3.00 秒〜4.44 秒） |
+
+フレーム数ではなく**秒**です。コンポのフレームレートに関係なく同じ結果になります。
+
+
+でき上がった **`Stride11 Fade CTRL` コンポ**の中の `CTRL` にある
+**Fade Progress（0→100）** がフェードの進行です。
+スライダーは**専用のコンポ `Stride11 Fade CTRL` の中**にあります。元のコンポに置くと、
+**プリコンポーズしたときに式が切れる**ためです（コンポはプリコンポーズで移動しません）。
+
 
 細かい手順・パターン表・手で組む場合の構造・式やキーフレームでの駆動方法は、
 すべて下の英語セクションに書いてあります（内容は `../ae/README.md` と同じです）。
@@ -168,9 +182,25 @@ The selector only appears when a remainder actually exists. 16:10 sources (1280x
 1. Open the composition holding the base and overlay layers
 2. Select both (**the lower one is the base**)
 3. File > Scripts > Run Script File… → `stride11_fade.jsx`
-4. Point it at the reveal map PNG, pick a direction, plane order and duration, press Build
+4. Point it at the reveal map PNG, pick a direction, plane order, duration and start time,
+   then press Build
 
-Animate **Fade Progress (0→100)** on the `Stride11 Fade CTRL` null.
+The dialog's fields:
+
+| Field | Unit | Meaning |
+|---|---|---|
+| Duration | **seconds** | How long the fade takes from start to finish. 1.44 matches the original |
+| Start at | **seconds** | **Where on the comp timeline the fade begins.** 0 is the start of the comp. Decimals are fine (3 runs from 3.00s to 4.44s) |
+
+Both are **seconds**, not frames, so the result does not depend on the comp's frame rate.
+
+
+Open the **`Stride11 Fade CTRL` comp** and animate **Fade Progress (0→100)** on the
+`CTRL` layer inside it.
+The slider lives **inside a comp of its own**, `Stride11 Fade CTRL`. Putting it in your
+comp would **break the expressions when you precompose** (comps are not moved by
+precomposing, layers are).
+
 
 The dialog offers the same four **plane orders** as the generator:
 
@@ -202,9 +232,9 @@ A copyable diagnostic dialog appears afterwards. If it fails, one `Ctrl+Z` undoe
 everything (the imported `revealmap` footage stays in the Project panel; delete it by
 hand if you do not want it).
 
-Running the script twice in the same comp produces a second `Stride11 Fade CTRL` with
-the same name — expressions resolve to the topmost one, so build into a fresh comp
-rather than stacking rigs.
+Running the script twice gives the second control comp a numbered name
+(`Stride11 Fade CTRL 2`), so the two rigs stay independent — `comp("name")` resolves by
+name, and two comps sharing one would be ambiguous.
 
 If **black fragments remain along the top of the screen after the fade finishes**, your
 map is an old one that still contains luminance 0. Export it again (see "How it works").
@@ -213,7 +243,8 @@ map is an old one that still contains luminance 0. Export it again (see "How it 
 
 ```
 [master comp]
-  Stride11 Fade CTRL (null)  — Slider Control "Fade Progress" 0-100
+  Stride11 Fade CTRL         the control comp, placed as a layer. Video off
+                             (inside it: CTRL (null) — Slider Control "Fade Progress" 0-100)
   Stride11 Fade OUT (solid)  — Set Channels
         red    <- MIX_1 red
         green  <- MIX_2 green
@@ -251,7 +282,7 @@ On AE 26.2.1 it is **0–1 with a default of 0.5**. The script detects this.
 On the Threshold Level:
 
 ```javascript
-var tau  = comp("comp name").layer("Stride11 Fade CTRL").effect("Fade Progress")(1) / 100;
+var tau  = comp("Stride11 Fade CTRL").layer("CTRL").effect("Fade Progress")(1) / 100;
 var prog = Math.max(0, Math.min(1, 3 * tau - 0));   // <- trailing 0 is the plane index
 1 * prog;                                            // <- the range; use 255 * prog if U is 255
 ```

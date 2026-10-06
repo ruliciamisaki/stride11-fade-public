@@ -50,8 +50,22 @@ tools/ae-transparent/
 3. **そのレイヤーを1枚だけ選択する**（元画像は選びません）
 4. ファイル > スクリプト > スクリプトファイルを実行… で
    `stride11_fade_transparent.jsx` を選ぶ
-5. ダイアログでマップ PNG・**向き**・プレーン順・尺を指定して「組み立てる」
-6. `Stride11 Fade CTRL` の `Fade Progress`（0→100）がフェードの進行です
+5. ダイアログでマップ PNG・**向き**・プレーン順・尺・開始時刻を指定して「組み立てる」
+
+ダイアログの入力欄は次の意味です。
+
+| 欄 | 単位 | 内容 |
+|---|---|---|
+| 尺 | **秒** | フェードが始まってから終わるまでの長さ。実機相当は 1.44 |
+| 開始時刻 | **秒** | **コンポ上の何秒からフェードを始めるか。** 0 なら先頭から。小数も使えます（3 と入れると 3.00 秒〜4.44 秒） |
+
+フレーム数ではなく**秒**です。コンポのフレームレートに関係なく同じ結果になります。
+
+6. **`Stride11 Fade CTRL` コンポ**を開き、その中の `CTRL` にある `Fade Progress`
+   （0→100）がフェードの進行です
+スライダーは**専用のコンポ `Stride11 Fade CTRL` の中**にあります。元のコンポに置くと、
+**プリコンポーズしたときに式が切れる**ためです（コンポはプリコンポーズで移動しません）。
+
 
 でき上がるのは `Stride11 Fade MUL`（乗算）と `Stride11 Fade ADD`（加算）の2枚です。
 **この2枚より下に背景を置いてください。** 上に置いたものには効きません。
@@ -145,7 +159,8 @@ Set Channels の「取得元」にアルファを指定すると、アルファ�
   Stride11 Fade ADD (平面)  加算 ─ Set Channels で ADD_p から各チャンネルを取る
   Stride11 Fade MUL (平面)  乗算 ─ Set Channels で MUL_p から各チャンネルを取る
   ADD_0..2 / MUL_0..2       ビデオOFF（Set Channels の参照先）
-  Stride11 Fade CTRL (ヌル) ─ スライダー "Fade Progress" 0-100  ← これをアニメート
+  Stride11 Fade CTRL        操作用コンポを置いたもの。ビデオOFF
+                            （中の CTRL にスライダー "Fade Progress" 0-100 ← これを動かす）
   重ね合わせレイヤー         ビデオOFF
   ── ここから下が背景 ──
 ```
@@ -174,6 +189,24 @@ Set Channels の配線も 3/3 で通っています。
   （途中で足すとレイヤー番号がずれるため）
 
 ### 修正履歴
+
+#### 2026-10-04 — プリコンポーズすると式が切れる
+
+組み立てたあと、ユーザーがマスターコンポでプリコンポーズすると
+
+```
+エクスプレッションが無効です。… 「Stride11 Fade CTRL」という名前のレイヤーが
+見つからないか、存在しません
+```
+
+が3プレーンぶん出ていました。スライダーをマスターコンポの**ヌル**に置いていたため、
+プリコンポーズでヌルが新しいコンポへ移動し、`comp("元の名前").layer("Stride11 Fade CTRL")`
+が解決できなくなったものです。
+
+**スライダーを専用コンポ `Stride11 Fade CTRL` の中へ移しました。** コンポは
+プリコンポーズで移動しないので、`comp("Stride11 Fade CTRL").layer("CTRL")` は
+元のコンポで何をしても生き残ります。マスターコンポにも表示 OFF で置いてあるので、
+タイムラインからダブルクリックで開けます。同名のコンポが既にあるときは番号を足します。
 
 #### 2026-09-14 — マップの明度 0 が開かない（マップ側の修正）
 
@@ -265,8 +298,23 @@ a two-layer rig to manage, so use it **only when you need it**.
 2. Open the comp containing the layer you want to fade in
 3. **Select that one layer** (do not select a base image)
 4. File > Scripts > Run Script File… → `stride11_fade_transparent.jsx`
-5. Point it at the map PNG, choose direction, plane order and duration, and build
-6. `Fade Progress` (0→100) on `Stride11 Fade CTRL` drives the fade
+5. Point it at the map PNG, choose direction, plane order, duration and start time, and build
+
+The dialog's fields:
+
+| Field | Unit | Meaning |
+|---|---|---|
+| Duration | **seconds** | How long the fade takes from start to finish. 1.44 matches the original |
+| Start at | **seconds** | **Where on the comp timeline the fade begins.** 0 is the start of the comp. Decimals are fine (3 runs from 3.00s to 4.44s) |
+
+Both are **seconds**, not frames, so the result does not depend on the comp's frame rate.
+
+6. Open the **`Stride11 Fade CTRL` comp**; `Fade Progress` (0→100) on the `CTRL` layer
+   inside it drives the fade
+The slider lives **inside a comp of its own**, `Stride11 Fade CTRL`. Putting it in your
+comp would **break the expressions when you precompose** (comps are not moved by
+precomposing, layers are).
+
 
 You get `Stride11 Fade MUL` (multiply) and `Stride11 Fade ADD` (add).
 **Put your background below those two layers** — anything above them is unaffected.
@@ -358,7 +406,8 @@ is a black solid instead of the base image. Sitting on black gives `overlay × �
   Stride11 Fade ADD (solid)  Add      ─ Set Channels pulls each channel from ADD_p
   Stride11 Fade MUL (solid)  Multiply ─ Set Channels pulls each channel from MUL_p
   ADD_0..2 / MUL_0..2        video off (Set Channels sources)
-  Stride11 Fade CTRL (null)  ─ slider "Fade Progress" 0-100  ← animate this
+  Stride11 Fade CTRL         the control comp, placed as a layer. Video off
+                             (inside it: CTRL with the slider "Fade Progress" 0-100)
   overlay layer              video off
   ── your background goes below here ──
 ```
@@ -387,6 +436,23 @@ New in this version:
   shifts the indices)
 
 ### Fix history
+
+#### 2026-10-04 — precomposing broke the expressions
+
+After building, precomposing in the master comp produced
+
+```
+expression disabled … no layer named "Stride11 Fade CTRL"
+```
+
+on all three planes. The slider sat on a **null in the master comp**, so precomposing
+moved that null into the new comp and `comp("old name").layer("Stride11 Fade CTRL")`
+stopped resolving.
+
+**The slider moved into a comp of its own, `Stride11 Fade CTRL`.** Comps are not moved by
+precomposing, so `comp("Stride11 Fade CTRL").layer("CTRL")` survives whatever you do in
+the master comp. It is also placed in the master comp with video off, so you can open it
+by double-clicking. If a comp of that name already exists, a number is appended.
 
 #### 2026-09-14 — luminance 0 never opens (fixed on the map side)
 

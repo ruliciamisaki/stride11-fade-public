@@ -247,10 +247,18 @@
   ]);
   planesDd.selection = 0;
   var r2 = g2.add('group');
-  r2.add('statictext', undefined, 'Duration (s)');
+  r2.spacing = 10;
+  /* Give the labels an explicit width. ScriptUI sometimes measures a label
+     narrower than it draws, which clips the tail of the text. */
+  var durLbl = r2.add('statictext', undefined, 'Duration (s)');
+  durLbl.preferredSize.width = 80;
   var durTxt = r2.add('edittext', undefined, '1.44'); durTxt.characters = 6;
-  r2.add('statictext', undefined, '  Start at (s)');
+  var startLbl = r2.add('statictext', undefined, 'Start at (s)');
+  startLbl.preferredSize.width = 80;
   var startTxt = r2.add('edittext', undefined, '0'); startTxt.characters = 6;
+  var startHint = g2.add('statictext', undefined,
+    'Start at is comp time in seconds. 0 is the start. Decimals are fine (3 runs 3.00-4.44s).');
+  startHint.preferredSize.width = 600;
   var rdir = g2.add('group');
   rdir.add('statictext', undefined, 'Direction');
   var dirDd = rdir.add('dropdownlist', undefined, ['Appear (fade in)', 'Disappear (fade out)']);
@@ -314,6 +322,23 @@
     return null;
   }
 
+  /**
+   * Return a composition name that is not in use yet.
+   * Two comps with the same name would make comp("name") ambiguous.
+   */
+  function uniqueCompName(base) {
+    var used = {};
+    for (var i = 1; i <= app.project.numItems; i++) {
+      var it = app.project.item(i);
+      if (it instanceof CompItem) used[String(it.name)] = true;
+    }
+    if (!used[base]) return base;
+    for (var n = 2; n < 1000; n++) {
+      if (!used[base + ' ' + n]) return base + ' ' + n;
+    }
+    return base + ' ' + (new Date()).getTime();
+  }
+
   /* ----------------------------------------------------------------- build */
   var failed = false;
   app.beginUndoGroup(SCRIPT);
@@ -337,10 +362,21 @@
       L('⚠ The map does not match the comp size. Re-export it at the comp size.');
     }
 
-    /* --- control null --------------------------------------------------- */
-    var ctrl = comp.layers.addNull(comp.duration);
-    ctrl.name = 'Stride11 Fade CTRL';
-    ctrl.enabled = false;
+    /* --- control comp ---------------------------------------------------
+     *
+     * The slider lives in **a comp of its own**. Put it in the master comp and
+     * precomposing moves the null into the new comp, which breaks the
+     * expressions with "layer not found". Comps are not moved by precomposing,
+     * so referring to one by name keeps working.
+     *
+     * It is also placed in the master comp (video off) so that it survives
+     * project cleanup and can be opened from the timeline.
+     */
+    var ctrlName = uniqueCompName('Stride11 Fade CTRL');
+    var ctrlComp = app.project.items.addComp(
+      ctrlName, 100, 100, comp.pixelAspect, comp.duration, comp.frameRate);
+    var ctrl = ctrlComp.layers.addNull(comp.duration);
+    ctrl.name = 'CTRL';
     var slider = addEffectAny(ctrl, ['ADBE Slider Control'], 'Slider Control');
     slider.name = 'Fade Progress';
     var sliderProp = byMatch(slider, 'ADBE Slider Control-0001') || firstAnimatableOneD(slider);
@@ -351,11 +387,15 @@
     for (var k = 1; k <= sliderProp.numKeys; k++) {
       try { sliderProp.setInterpolationTypeAtKey(k, KeyframeInterpolationType.LINEAR, KeyframeInterpolationType.LINEAR); } catch (e) {}
     }
+    var ctrlRef = comp.layers.add(ctrlComp);
+    ctrlRef.name = ctrlName;
+    ctrlRef.enabled = false;
+    L('Control comp: "' + ctrlName + '" (animate CTRL inside it)');
     L('Fade Progress: ' + startAt + 's → ' + (startAt + duration) + 's');
     L(fadeOut ? 'Direction: disappear (appearance reversed)' : 'Direction: appear');
     // Address sub-properties by index, not by name — display names are localized.
-    var compRef = String(comp.name).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    var CTRL_EXPR = 'comp("' + compRef + '").layer("Stride11 Fade CTRL").effect("Fade Progress")(1)';
+    var compRef = String(ctrlName).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    var CTRL_EXPR = 'comp("' + compRef + '").layer("CTRL").effect("Fade Progress")(1)';
 
     /* --- one MIX comp per plane ----------------------------------------- */
     var mixComps = [];
@@ -477,7 +517,8 @@
     ovlLayer.enabled = false;
     L('Turned video off on the original two layers (their content now lives in the MIX comps)');
     L('');
-    L('Done. Animate Fade Progress (0→100) on "Stride11 Fade CTRL".');
+    L('Done. Open the control comp "' + ctrlName + '" and animate Fade Progress');
+    L('(0→100) on CTRL. Precomposing in this comp will not break it.');
     L('※ If the motion looks uneven, set Project Settings > Color > Working Space to None,');
     L('   or match the revealmap footage interpretation to the working space.');
 
